@@ -1,0 +1,10 @@
+﻿pandas
+numpy
+xarray
+lightgbm
+scikit-learn
+matplotlib
+streamlit
+netCDF4
+h5netcdf
+requests
