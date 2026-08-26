@@ -43,7 +43,7 @@ def train():
     with open('model.pkl', 'wb') as f:
         pickle.dump(artifact, f)
 
-    # Save test observations for real ground-truth comparisons in Streamlit
+    # Export actual test set observations for ground-truth validation in Streamlit
     test_data = pd.concat([X_test, y_test], axis=1)
     test_data.to_csv('test_sample.csv', index=False)
 
