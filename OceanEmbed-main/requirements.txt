@@ -1,0 +1,20 @@
+﻿pandas
+numpy
+xarray
+lightgbm
+scikit-learn
+matplotlib
+streamlit
+netCDF4
+h5netcdf
+requests
+# Scientific / oceanographic
+gsw
+argopy
+pyproj
+haversine
+xgboost
+scipy
+# Optional / advanced
+torch
+dask
