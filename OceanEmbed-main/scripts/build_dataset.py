@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = ROOT / 'data' / 'raw' / 'argo'
 
 
-def main(use_raw=False, max_profiles=500):
+def main(use_raw=False, max_profiles=500, skip_validation=False):
     # 1. fetch raw argo (optional)
     if use_raw:
         from data.argo_fetch import fetch_profiles_bbox
@@ -36,11 +36,38 @@ def main(use_raw=False, max_profiles=500):
         return
 
     logger.info('Dataset build complete')
+    
+    # 4. VALIDATE DATASET (critical for real-data pipeline)
+    if not skip_validation:
+        logger.info("")
+        logger.info("=" * 60)
+        logger.info("RUNNING DATA VALIDATION (required before training)")
+        logger.info("=" * 60)
+        from scripts.validate_dataset import generate_validation_report
+        from pathlib import Path
+        dataset_path = ROOT / 'data' / 'dataset' / 'train_dataset.parquet'
+        output_path = ROOT / 'data' / 'dataset' / 'validation_report.txt'
+        
+        is_valid = generate_validation_report(dataset_path, output_path)
+        
+        if not is_valid:
+            logger.error("")
+            logger.error("❌ DATASET VALIDATION FAILED")
+            logger.error("Synthetic data detected in training dataset.")
+            logger.error("BLOCKING: You cannot train model.pkl on synthetic/fabricated data.")
+            logger.error(f"See {output_path} for details.")
+            raise RuntimeError("Synthetic data detected. Training blocked.")
+        else:
+            logger.info("")
+            logger.info("✅ DATASET VALIDATION PASSED")
+            logger.info("Dataset contains real observations. Safe to proceed to training.")
+            logger.info(f"Validation report: {output_path}")
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--use-raw', action='store_true', help='Try to fetch raw Argo profiles first')
     parser.add_argument('--max-profiles', type=int, default=500, help='Maximum number of raw profiles to process')
+    parser.add_argument('--skip-validation', action='store_true', help='Skip data validation (NOT recommended for real data)')
     args = parser.parse_args()
-    main(use_raw=args.use_raw, max_profiles=args.max_profiles)
+    main(use_raw=args.use_raw, max_profiles=args.max_profiles, skip_validation=args.skip_validation)
