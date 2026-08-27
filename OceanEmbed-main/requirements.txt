@@ -8,6 +8,7 @@ streamlit
 netCDF4
 h5netcdf
 requests
+openai
 # Scientific / oceanographic
 gsw
 argopy

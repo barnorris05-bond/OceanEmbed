@@ -22,14 +22,20 @@ def pressure_to_depth(p, lat):
     """Convert pressure (dbar) to depth (m) using gsw when available, else simple approximation.
     p: array-like pressures
     lat: scalar latitude
+    
+    Attempts TEOS-10 conversion via gsw.z_from_p (preferred for oceanographic accuracy).
+    Falls back to simple 1 dbar ≈ 1 m approximation if gsw unavailable, with explicit logging.
     """
     try:
         import gsw
         z = gsw.z_from_p(p, lat)  # returns negative z
+        logger.debug("Using TEOS-10 (gsw) for pressure -> depth conversion")
         return -z
-    except Exception:
-        # fallback with warning
-        logger.debug("gsw not available; using 1 dbar ~= 1 m approximation for pressure->depth")
+    except ImportError:
+        logger.warning("gsw module not available; using approximate 1 dbar ≈ 1 m for pressure->depth. Install gsw for TEOS-10 accuracy.")
+        return np.array(p, dtype=float)
+    except Exception as e:
+        logger.warning(f"gsw conversion failed ({e}); falling back to 1 dbar ≈ 1 m approximation")
         return np.array(p, dtype=float)
 
 
@@ -77,6 +83,24 @@ def process_netcdf_profile(nc_path):
     except Exception as e:
         logger.warning(f"Failed to open {p}: {e}")
         return None
+
+    # WMO (float identifier) and cycle number
+    wmo = None
+    cycle = None
+    for candidate in ['PLATFORM_NUMBER', 'platform_number', 'WMO']:
+        if candidate in ds.variables:
+            try:
+                wmo = str(ds[candidate].values.ravel()[0])
+                break
+            except Exception:
+                pass
+    for candidate in ['CYCLE_NUMBER', 'cycle_number', 'CYCLE']:
+        if candidate in ds.variables:
+            try:
+                cycle = int(ds[candidate].values.ravel()[0])
+                break
+            except Exception:
+                pass
 
     # Temperature variable selection (prefer adjusted measurements)
     if 'TEMP_ADJUSTED' in ds:
@@ -151,9 +175,9 @@ def process_netcdf_profile(nc_path):
     depths = depths[idx]
     temps = temps[idx]
 
-    # Check coverage: require surface (~0-5m) and at least ~500m max depth to include profile
-    if depths.min() > 5.0 or depths.max() < (MIN_REQUIRED_MAX_DEPTH - 50.0):
-        logger.debug(f"Profile {p} depth coverage insufficient: {depths.min():.1f}-{depths.max():.1f} m")
+    # Check coverage: require surface (~0-5m) and at least 500m max depth to include profile
+    if depths.min() > 5.0 or depths.max() < MIN_REQUIRED_MAX_DEPTH:
+        logger.debug(f"Profile {p} depth coverage insufficient: {depths.min():.1f}-{depths.max():.1f} m (requires min {MIN_REQUIRED_MAX_DEPTH}m)")
         return None
 
     # Interpolate without extrapolation: points outside observed range become NaN
@@ -174,6 +198,8 @@ def process_netcdf_profile(nc_path):
         return None
 
     rec = {
+        'argo_wmo': wmo,
+        'argo_cycle': cycle,
         'source_file': str(p.name),
         'lat': float(lat),
         'lon': float(lon),

@@ -1,5 +1,8 @@
 ﻿# 🌊 OceanEmbed AI — Subsurface Ocean Temperature Estimator
-An AI-driven oceanographic framework predicting subsurface ocean temperatures (50m, 100m, 200m, 500m) in the Arabian Sea using surface ocean parameters (SST, SSH, SSS) validated against Argo float profiles.
+
+An AI-driven oceanographic framework for predicting subsurface ocean temperatures (50m, 100m, 200m, 500m) in the Arabian Sea using surface ocean parameters (SST, SSH, SSS). This repository includes a real-Argo preprocessing and surface-observation matching pipeline, alongside a prototype model for development and testing.
+
+**Note:** The framework is designed to train and validate models using quality-controlled Argo float observations paired with satellite-derived surface measurements. The current `model.pkl` is a prototype baseline. Real-data model training will proceed after validation of the data pipeline.
 
 ## 📁 Repository Structure
 ```text

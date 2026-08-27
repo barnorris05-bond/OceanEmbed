@@ -50,6 +50,8 @@ def match_surface_features(processed_parquet, spatial_radius_km=25, time_window_
             continue
 
         rec = {
+            'argo_wmo': r.get('argo_wmo'),
+            'argo_cycle': r.get('argo_cycle'),
             'profile_id': r.get('source_file', f"p_{_}"),
             'lat': lat,
             'lon': lon,
@@ -60,21 +62,17 @@ def match_surface_features(processed_parquet, spatial_radius_km=25, time_window_
             'wind_u': surf.get('wind_u') if surf.get('wind_u') is not None else np.nan,
             'wind_v': surf.get('wind_v') if surf.get('wind_v') is not None else np.nan,
             'wind_speed': surf.get('wind_speed') if surf.get('wind_speed') is not None else np.nan,
-            'match_count': 1,
-            'surface_obs_time': surf.get('obs_time'),
+            'surface_time': surf.get('obs_time'),
             'surface_obs_lat': surf.get('obs_lat'),
             'surface_obs_lon': surf.get('obs_lon'),
-            'surface_distance_km': surf.get('distance_km')
-        }
-        # add target temps
-        rec.update({
+            'surface_distance_km': surf.get('distance_km'),
             'temperature_0m': r['temperature_0m'],
             'temperature_50m': r['temperature_50m'],
             'temperature_100m': r['temperature_100m'],
             'temperature_200m': r['temperature_200m'],
             'temperature_500m': r['temperature_500m'],
             'temperature_1000m': r['temperature_1000m']
-        })
+        }
         rows.append(rec)
     if not rows:
         logger.warning('No matched rows produced')
