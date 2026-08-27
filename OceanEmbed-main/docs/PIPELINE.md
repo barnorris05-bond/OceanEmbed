@@ -19,7 +19,7 @@ This document explains the new observation-trained data pipeline and how to run 
    - Output: data/dataset/train_dataset.parquet
 
 5) Train baseline
-   - Use models/train_baseline.py (to be implemented): trains LightGBM multi-output baseline and saves model.pkl
+   - Use train_model.py: trains LightGBM multi-output baseline and saves model.pkl
 
 6) Inference & App
    - inference/predict.py loads model.pkl and performs inference

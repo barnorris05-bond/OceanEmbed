@@ -187,7 +187,8 @@ with tab1:
             Surface Inputs: SST={sst}°C, SSH={ssh}m, SSS={sss}PSU
             Predicted Profiles: 50m={predicted_profile[1]}°C, 100m={predicted_profile[2]}°C, 200m={predicted_profile[3]}°C, 500m={predicted_profile[4]}°C
             Errors vs Argo: 50m={errors[0]:.2f}°C, 100m={errors[1]:.2f}°C, 200m={errors[2]:.2f}°C, 500m={errors[3]:.2f}°C
-            Provide a 3-bullet physical summary of thermocline decay and local confidence.
+            
+            Interpret only the supplied observations, predictions, errors, and model metrics. Do not invent measurements or causal explanations. Clearly distinguish predictions from observations. Discuss prediction reliability using the supplied errors rather than claiming statistical confidence.
             """
             st.info(query_nemotron(prompt))
 
@@ -196,9 +197,12 @@ with tab2:
     if st.button("Generate Reliability Breakdown"):
         with st.spinner("Nemotron evaluating error metrics..."):
             prompt = f"""
-            System: You are an ML diagnostic expert. Analyze these depth metrics:
+            Analyze these depth metrics:
             {real_metrics_df.to_string(index=False)}
-            Explain why error accumulates at 500m and where user confidence is highest.
+            
+            Interpret only the supplied observations, predictions, errors, and model metrics. Do not invent measurements or causal explanations. Clearly distinguish predictions from observations. Discuss prediction reliability using the supplied errors rather than claiming statistical confidence.
+            
+            Explain where error is largest and where user confidence is highest based solely on these metrics.
             """
             st.warning(query_nemotron(prompt))
 
@@ -220,7 +224,10 @@ with tab3:
             Compare two ocean locations:
             Location A ({b_data['name']}): SST={b_data['sst']}°C, 50m={b_data['pred'][0]}°C, 500m={b_data['pred'][3]}°C
             Location B ({selected_str}): SST={sst}°C, 50m={predicted_profile[1]}°C, 500m={predicted_profile[4]}°C
-            Contrast thermal gradients and thermocline decay in 3 concise bullet points.
+            
+            Interpret only the supplied observations, predictions, errors, and model metrics. Do not invent measurements or causal explanations. Clearly distinguish predictions from observations. Discuss prediction reliability using the supplied errors rather than claiming statistical confidence.
+            
+            Contrast thermal gradients in 2-3 concise bullet points based solely on the data provided.
             """
             st.success(query_nemotron(prompt))
 
@@ -230,7 +237,10 @@ with tab4:
     if query:
         with st.spinner("Copilot generating response..."):
             prompt = f"""
-            Answer as OceanEmbed AI Assistant for location {lat}°N, {lon}°E (SST: {sst}°C, 500m Pred: {predicted_profile[4]}°C).
+            Context: OceanEmbed AI is predicting ocean subsurface temperatures for location {lat}°N, {lon}°E (SST: {sst}°C, 500m Predicted: {predicted_profile[4]}°C).
+            
             User Question: {query}
+            
+            Interpret only the supplied observations, predictions, errors, and model metrics. Do not invent measurements or causal explanations. Clearly distinguish predictions from observations. Discuss prediction reliability using the supplied errors rather than claiming statistical confidence.
             """
             st.markdown(f"**Copilot Response:**\n\n{query_nemotron(prompt)}")
