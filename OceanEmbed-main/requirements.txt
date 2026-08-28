@@ -1,4 +1,4 @@
-﻿pandas
+pandas
 numpy
 xarray
 lightgbm
@@ -7,11 +7,13 @@ matplotlib
 streamlit
 netCDF4
 h5netcdf
+pyarrow
 requests
 openai
 # Scientific / oceanographic
 gsw
 argopy
+erddapy
 pyproj
 haversine
 xgboost
@@ -19,3 +21,4 @@ scipy
 # Optional / advanced
 torch
 dask
+
