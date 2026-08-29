@@ -10,3 +10,4 @@ land-ne-110m.zip
 land_data/
 *.log
 *.log.err
+model.pkl
