@@ -5,3 +5,9 @@ __pycache__/
 .vscode/
 .idea/
 .streamlit/secrets.toml
+.freebuff/
+land-ne-110m.zip
+land_data/
+*.log
+*.log.err
+model.pkl
