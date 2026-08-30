@@ -1,20 +1,31 @@
 #!/bin/bash
-# Render build script for OceanEmbed
-# Trains the ML model and downloads land mask data
-
+# Vercel build script for OceanEmbed
 set -e
 
-echo "=== OceanEmbed Build ==="
+echo "=== OceanEmbed Vercel Build ==="
 
 # 1. Train the ML model from ocean_data.csv -> model.pkl
-echo "Training ML model from ocean_data.csv..."
+echo "[1/2] Training ML model..."
 python train_model.py
 
-# 2. Download Natural Earth 110m land shapefiles for the land mask
-echo "Downloading Natural Earth land data..."
+# 2. Download Natural Earth 110m land shapefiles using Python (no unzip needed)
+echo "[2/2] Downloading land mask data..."
 mkdir -p land_data
-curl -sL -o /tmp/land.zip "https://naciscdn.org/naturalearth/110m/physical/ne_110m_land.zip"
-unzip -o /tmp/land.zip -d land_data/ ne_110m_land.* 2>/dev/null || unzip -o /tmp/land.zip -d land_data/ 2>/dev/null
-rm -f /tmp/land.zip
+python -c "
+import urllib.request, zipfile, io, os
+url = 'https://naciscdn.org/naturalearth/110m/physical/ne_110m_land.zip'
+print('Downloading from', url)
+data = urllib.request.urlopen(url).read()
+z = zipfile.ZipFile(io.BytesIO(data))
+for name in z.namelist():
+    if 'ne_110m_land' in name:
+        z.extract(name, 'land_data/')
+        print('  Extracted:', name)
+print('Land data ready.')
+"
+
+# 3. Copy frontend to public/ (Vercel serves static from here)
+mkdir -p public
+cp frontend/index.html public/index.html
 
 echo "=== Build complete ==="

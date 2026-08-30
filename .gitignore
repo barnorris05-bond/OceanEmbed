@@ -11,3 +11,5 @@ land_data/
 *.log
 *.log.err
 model.pkl
+public/
+.vercel/
