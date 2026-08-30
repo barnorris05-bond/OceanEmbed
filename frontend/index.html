@@ -403,6 +403,21 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-deep);color:va
 @media(max-width:900px){.ambient-bg{opacity:0.5}.cursor-glow{display:none}}
 
 /* ═══════════════════════════════════════════════════════════════
+   CYCLONE INTELLIGENCE
+   ═══════════════════════════════════════════════════════════════ */
+.cy-risk-elevated{color:var(--error);font-weight:700}
+.cy-risk-moderate{color:var(--warning);font-weight:700}
+.cy-risk-low{color:var(--success);font-weight:700}
+.cy-track-line{stroke:var(--accent);stroke-width:2.5;fill:none;stroke-dasharray:8,4}
+.cy-peak-marker{fill:var(--error);stroke:#fff;stroke-width:2}
+.cy-marker-elevated{fill:var(--error)}
+.cy-marker-moderate{fill:var(--warning)}
+.cy-marker-low{fill:var(--success)}
+.cy-table-row{cursor:pointer;transition:background var(--dur-fast) var(--ease-out)}
+.cy-table-row:hover{background:rgba(56,168,255,.06)}
+.cy-table-row.selected{background:rgba(56,168,255,.10)}
+
+/* ═══════════════════════════════════════════════════════════════
    COPILOT
    ═══════════════════════════════════════════════════════════════ */
 .copilot-fab{position:fixed;bottom:20px;left:calc(var(--sidebar-w) + 20px);z-index:250;width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#2563eb,#1e40af);border:2px solid rgba(96,165,250,0.30);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 20px rgba(37,99,235,0.35),0 0 30px rgba(37,99,235,0.10);transition:transform var(--dur-fast) var(--ease-out),box-shadow var(--dur-fast) var(--ease-out);font-size:20px}
@@ -487,6 +502,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-deep);color:va
     <a class="sb-item" data-s="observations" onclick="go('observations')"><i data-lucide="map-pin"></i> Observations</a>
     <a class="sb-item" data-s="prediction" onclick="go('prediction')"><i data-lucide="thermometer"></i> Subsurface Prediction</a>
     <a class="sb-item" data-s="analysis" onclick="go('analysis')"><i data-lucide="brain"></i> AI Analysis</a>
+    <a class="sb-item" data-s="cyclone" onclick="go('cyclone')"><i data-lucide="wind"></i> Cyclone Intelligence</a>
     <div class="sb-label" style="margin-top:4px">Data & Model</div>
     <a class="sb-item" data-s="validation" onclick="go('validation')"><i data-lucide="bar-chart-3"></i> Model Validation</a>
     <a class="sb-item" data-s="provenance" onclick="go('provenance')"><i data-lucide="shield-check"></i> Data Provenance</a>
@@ -622,6 +638,109 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg-deep);color:va
   <div class="sec-head"><div class="sec-title">Model Validation</div><div class="sec-sub">Performance evaluation on held-out real Argo observations</div></div>
   <div class="info-banner" style="margin-bottom:16px"><span>Float-aware validation: profiles from the same Argo float are grouped to reduce leakage.</span></div>
   <div id="val-content"><div class="empty"><div class="empty-icon">📊</div><div class="empty-title">Loading metrics...</div></div></div>
+</section>
+
+<!-- ═══════ CYCLONE INTELLIGENCE ═══════ -->
+<section class="section" id="s-cyclone">
+  <div class="sec-head">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <div class="sec-title">Cyclone Intelligence</div>
+      <span class="badge badge-derived">OCEAN HEAT ASSESSMENT</span>
+    </div>
+    <div class="sec-sub">Assess subsurface ocean conditions that may support cyclone intensification</div>
+  </div>
+
+  <!-- Track Input -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-label" style="margin-bottom:8px">Cyclone Track Input</div>
+    <textarea id="cy-track-input" rows="5" placeholder="lat,lon,date&#10;12.0,65.0,2026-08-30&#10;13.0,66.0,2026-08-31&#10;14.0,67.0,2026-09-01" style="width:100%;background:var(--bg-input);border:1px solid var(--border-default);border-radius:var(--r-md);padding:10px 14px;font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--text-primary);resize:vertical;min-height:100px"></textarea>
+    <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn btn-p" onclick="analyzeCycloneTrack()" id="cy-analyze-btn"><i data-lucide="activity" style="width:15px;height:15px"></i> Analyze Track</button>
+      <button class="btn btn-demo" onclick="loadDemoTrack()">▶ Demo Track</button>
+      <span id="cy-status" style="font-size:.74rem;color:var(--text-tertiary)"></span>
+    </div>
+    <div id="cy-error" style="margin-top:10px"></div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div id="cy-summary" style="display:none">
+    <div class="metrics-row" style="margin-bottom:16px">
+      <div class="card metric-card mc-sst" id="cy-peak-d26">
+        <div class="card-label">Peak Ocean Heat Support</div>
+        <div class="mc-val">—</div>
+        <div class="mc-source">D26 depth (26 °C isotherm)</div>
+      </div>
+      <div class="card metric-card mc-loc" id="cy-risk">
+        <div class="card-label">Risk Level</div>
+        <div class="mc-val">—</div>
+        <div class="mc-source">Ocean heat classification</div>
+      </div>
+      <div class="card metric-card mc-ssh" id="cy-peak-loc">
+        <div class="card-label">Peak Location</div>
+        <div class="mc-val" style="font-size:1.1rem">—</div>
+        <div class="mc-source">Highest D26 along track</div>
+      </div>
+      <div class="card metric-card mc-sss" id="cy-confidence">
+        <div class="card-label">Confidence</div>
+        <div class="mc-val">—</div>
+        <div class="mc-source">Based on nearest observation</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Two-col: Map + Table -->
+  <div id="cy-content" style="display:none">
+    <div class="two-col" style="margin-bottom:16px">
+      <div>
+        <div class="map-wrap" style="height:420px"><div id="cy-map"></div></div>
+      </div>
+      <div>
+        <div class="card" style="overflow-x:auto">
+          <div class="card-label" style="margin-bottom:8px">Track Analysis</div>
+          <table style="width:100%;border-collapse:collapse;font-size:.76rem">
+            <thead>
+              <tr style="border-bottom:1px solid var(--border-subtle)">
+                <th style="text-align:left;padding:6px 8px;color:var(--text-tertiary);font-weight:600">Date</th>
+                <th style="text-align:left;padding:6px 8px;color:var(--text-tertiary);font-weight:600">Lat</th>
+                <th style="text-align:left;padding:6px 8px;color:var(--text-tertiary);font-weight:600">Lon</th>
+                <th style="text-align:right;padding:6px 8px;color:var(--text-tertiary);font-weight:600">D26</th>
+                <th style="text-align:center;padding:6px 8px;color:var(--text-tertiary);font-weight:600">Risk</th>
+                <th style="text-align:center;padding:6px 8px;color:var(--text-tertiary);font-weight:600">Conf.</th>
+                <th style="text-align:right;padding:6px 8px;color:var(--text-tertiary);font-weight:600">Nearest Obs.</th>
+              </tr>
+            </thead>
+            <tbody id="cy-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Subsurface Profile for selected track point -->
+    <div class="card" id="cy-profile-card" style="display:none">
+      <div class="card-label" style="margin-bottom:8px">Predicted Subsurface Temperature</div>
+      <div style="font-size:.78rem;color:var(--text-tertiary);margin-bottom:12px">Temperature profile at selected track point — <span class="badge badge-predicted">PREDICTED</span></div>
+      <div class="two-col" style="gap:16px">
+        <div class="chart-box"><div class="chart-canvas"><canvas id="cy-chart"></canvas></div></div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:.82rem">
+          <div id="cy-profile-info" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Why This Matters -->
+  <div class="card" style="margin-top:16px">
+    <div class="card-label" style="margin-bottom:6px">Why This Matters</div>
+    <div style="font-size:.82rem;color:var(--text-secondary);line-height:1.7">
+      OceanEmbed reconstructs subsurface temperature from satellite surface observations. A deeper 26 °C isotherm (D26) indicates a deeper reservoir of warm water. If a cyclone passes over such warm water, the ocean may provide greater heat support for storm intensification.
+    </div>
+  </div>
+
+  <!-- Disclaimer -->
+  <div class="error-banner" style="margin-top:16px;border-color:rgba(251,191,36,.18);background:rgba(251,191,36,.04);color:var(--warning)">
+    <span>⚠️</span>
+    <span>OceanEmbed estimates ocean conditions that may support cyclone intensification. It does not predict cyclone track, landfall, wind speed, or official cyclone warnings. This is an educational ocean-heat assessment and should not replace official IMD/JTWC forecasts.</span>
+  </div>
 </section>
 
 <!-- ═══════ DATA PROVENANCE ═══════ -->
@@ -1212,6 +1331,241 @@ function notify(msg, type = 'info') {
   el.textContent = msg;
   document.body.appendChild(el);
   setTimeout(() => { el.style.opacity = '0'; el.style.transition = 'opacity .3s'; setTimeout(() => el.remove(), 300); }, 3000);
+}
+
+// ═══════════════════════════════════════════════════════════════
+//   CYCLONE INTELLIGENCE
+// ═══════════════════════════════════════════════════════════════
+let cyMap = null, cyTrackData = null, cyChart = null;
+
+function loadDemoTrack() {
+  // Demo track within the validated Arabian Sea domain
+  const demo = [
+    { lat: 12.0, lon: 65.0, date: '2026-08-30' },
+    { lat: 12.8, lon: 65.8, date: '2026-08-31' },
+    { lat: 13.6, lon: 66.5, date: '2026-09-01' },
+    { lat: 14.5, lon: 67.2, date: '2026-09-02' },
+    { lat: 15.3, lon: 68.0, date: '2026-09-03' },
+    { lat: 16.0, lon: 68.8, date: '2026-09-04' },
+  ];
+  document.getElementById('cy-track-input').value = demo.map(p => `${p.lat},${p.lon},${p.date}`).join('\n');
+  notify('Demo track loaded — click Analyze Track', 'success');
+}
+
+async function analyzeCycloneTrack() {
+  const raw = document.getElementById('cy-track-input').value.trim();
+  if (!raw) { showCyError('Please enter a cyclone track (lat,lon,date per line).'); return; }
+  const lines = raw.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#'));
+  const points = [];
+  for (const line of lines) {
+    const parts = line.split(',');
+    if (parts.length < 3) { showCyError(`Invalid line: "${line}" — expected lat,lon,date`); return; }
+    const lat = parseFloat(parts[0]); const lon = parseFloat(parts[1]); const date = parts[2].trim();
+    if (isNaN(lat) || isNaN(lon)) { showCyError(`Invalid coordinates in line: "${line}"`); return; }
+    points.push({ lat, lon, date });
+  }
+  if (points.length < 2) { showCyError('Track must contain at least 2 points.'); return; }
+  if (points.length > 50) { showCyError('Track too long. Maximum 50 points.'); return; }
+
+  document.getElementById('cy-error').innerHTML = '';
+  document.getElementById('cy-status').textContent = 'Analyzing track...';
+  document.getElementById('cy-analyze-btn').disabled = true;
+  showCyLoading();
+
+  const resp = await apiPost('/api/cyclone-track', { points });
+  document.getElementById('cy-analyze-btn').disabled = false;
+  document.getElementById('cy-status').textContent = '';
+
+  if (!resp) { showCyError('Failed to reach the server. Check if the backend is running.'); hideCyLoading(); return; }
+  if (resp.error) { showCyError(resp.error); hideCyLoading(); return; }
+
+  cyTrackData = resp;
+  renderCySummary(resp);
+  renderCyMap(resp);
+  renderCyTable(resp);
+  document.getElementById('cy-summary').style.display = 'block';
+  document.getElementById('cy-content').style.display = 'block';
+  notify(`Track analyzed: ${resp.validPoints}/${resp.totalPoints} valid points`, 'success');
+}
+
+function showCyError(msg) {
+  document.getElementById('cy-error').innerHTML = `<div class="error-banner">⚠️ ${msg}</div>`;
+}
+function showCyLoading() {
+  document.getElementById('cy-summary').style.display = 'none';
+  document.getElementById('cy-content').style.display = 'none';
+}
+function hideCyLoading() {
+  document.getElementById('cy-summary').style.display = 'none';
+  document.getElementById('cy-content').style.display = 'none';
+}
+
+function renderCySummary(resp) {
+  const peak = resp.peak;
+  if (!peak) return;
+  const d26El = document.getElementById('cy-peak-d26');
+  const riskEl = document.getElementById('cy-risk');
+  const locEl = document.getElementById('cy-peak-loc');
+  const confEl = document.getElementById('cy-confidence');
+  d26El.querySelector('.mc-val').textContent = peak.d26 !== null ? `${peak.d26} m` : 'N/A';
+  riskEl.querySelector('.mc-val').textContent = peak.riskLevel;
+  riskEl.querySelector('.mc-val').className = `mc-val cy-risk-${peak.riskLevel.toLowerCase()}`;
+  locEl.querySelector('.mc-val').textContent = `${peak.lat.toFixed(2)}°N, ${peak.lon.toFixed(2)}°E`;
+  // Find confidence for peak
+  const peakResult = resp.results.find(r => r.index === peak.index);
+  confEl.querySelector('.mc-val').textContent = peakResult ? peakResult.confidence : '—';
+}
+
+function renderCyMap(resp) {
+  const validPts = resp.results.filter(r => r.valid);
+  if (!validPts.length) return;
+  const container = document.getElementById('cy-map');
+  if (cyMap) { cyMap.remove(); cyMap = null; }
+  cyMap = L.map(container, { center: [validPts[0].lat, validPts[0].lon], zoom: 6, zoomControl: false });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OSM &copy; CARTO', subdomains: 'abcd', maxZoom: 19
+  }).addTo(cyMap);
+  L.control.zoom({ position: 'bottomleft' }).addTo(cyMap);
+
+  // Draw track line
+  const trackCoords = validPts.map(p => [p.lat, p.lon]);
+  if (trackCoords.length >= 2) {
+    L.polyline(trackCoords, { color: '#38a8ff', weight: 2.5, dashArray: '8,4', opacity: 0.8 }).addTo(cyMap);
+  }
+
+  // Add markers
+  validPts.forEach((p, i) => {
+    const isPeak = resp.peak && p.index === resp.peak.index;
+    const riskClass = p.riskLevel.toLowerCase();
+    const color = riskClass === 'elevated' ? '#f87171' : riskClass === 'moderate' ? '#fbbf24' : '#34d399';
+    const marker = L.circleMarker([p.lat, p.lon], {
+      radius: isPeak ? 9 : 6,
+      fillColor: color,
+      color: isPeak ? '#fff' : 'rgba(255,255,255,0.3)',
+      weight: isPeak ? 2.5 : 1.5,
+      fillOpacity: 0.9
+    });
+    marker.bindTooltip(
+      `<div style="font-family:Inter;font-size:11px;background:#1a2340;color:#e8f0fe;padding:6px 10px;border-radius:6px;border:1px solid rgba(100,160,255,0.10)"><strong>${p.lat.toFixed(2)}°N, ${p.lon.toFixed(2)}°E</strong><br>` +
+      `<span style="color:#94a3c0;font-size:10px">${p.date}</span><br>` +
+      `<span style="color:${color};font-weight:600">D26: ${p.d26 !== null ? p.d26 + 'm' : 'N/A'} · ${p.riskLevel}</span>` +
+      (isPeak ? '<br><span style="color:#f87171;font-size:10px;font-weight:600">★ Peak Ocean Heat Support</span>' : '') +
+      '</div>',
+      { direction: 'top', offset: [0, -8] }
+    );
+    marker.on('click', () => selectCyPoint(p.index));
+    marker.addTo(cyMap);
+  });
+
+  // Fit bounds
+  const bounds = L.latLngBounds(trackCoords);
+  cyMap.fitBounds(bounds, { padding: [40, 40] });
+}
+
+function renderCyTable(resp) {
+  const tbody = document.getElementById('cy-table-body');
+  tbody.innerHTML = resp.results.map((r, i) => {
+    if (!r.valid) {
+      return `<tr style="border-bottom:1px solid var(--border-subtle)"><td colspan="7" style="padding:6px 8px;color:var(--error);font-size:.74rem">Point ${i + 1}: ${r.error || 'Invalid'}</td></tr>`;
+    }
+    const isPeak = resp.peak && r.index === resp.peak.index;
+    const riskClass = `cy-risk-${r.riskLevel.toLowerCase()}`;
+    return `<tr class="cy-table-row" data-idx="${r.index}" onclick="selectCyPoint(${r.index})">
+      <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:.72rem">${r.date}</td>
+      <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:.72rem">${r.lat.toFixed(2)}°N</td>
+      <td style="padding:6px 8px;font-family:'JetBrains Mono',monospace;font-size:.72rem">${r.lon.toFixed(2)}°E</td>
+      <td style="padding:6px 8px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.72rem;font-weight:600">${r.d26 !== null ? r.d26 + 'm' : '—'}${isPeak ? ' ★' : ''}</td>
+      <td style="padding:6px 8px;text-align:center"><span class="badge ${r.riskLevel === 'Elevated' ? 'badge-predicted' : r.riskLevel === 'Moderate' ? 'badge-matched' : 'badge-validated'}">${r.riskLevel}</span></td>
+      <td style="padding:6px 8px;text-align:center;font-size:.72rem;color:var(--text-tertiary)">${r.confidence}</td>
+      <td style="padding:6px 8px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--text-tertiary)">${r.nearestObsDistanceKm} km</td>
+    </tr>`;
+  }).join('');
+}
+
+function selectCyPoint(index) {
+  if (!cyTrackData) return;
+  const pt = cyTrackData.results.find(r => r.index === index);
+  if (!pt || !pt.valid) return;
+  // Highlight table row
+  document.querySelectorAll('.cy-table-row').forEach(r => r.classList.remove('selected'));
+  const row = document.querySelector(`.cy-table-row[data-idx="${index}"]`);
+  if (row) row.classList.add('selected');
+  // Show profile
+  renderCyProfile(pt);
+}
+
+function renderCyProfile(pt) {
+  const card = document.getElementById('cy-profile-card');
+  card.style.display = 'block';
+  const p = pt.predicted;
+  const s = pt.surface;
+  // Update info panel
+  document.getElementById('cy-profile-info').innerHTML = `
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--text-tertiary)">Location</span><span style="font-weight:600;font-family:'JetBrains Mono',monospace">${pt.lat.toFixed(2)}°N, ${pt.lon.toFixed(2)}°E</span></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--text-tertiary)">Date</span><span style="font-weight:600">${pt.date}</span></div>
+    <div style="height:1px;background:var(--border-subtle);margin:4px 0"></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--text-tertiary)">SST</span><span style="font-weight:600;font-family:'JetBrains Mono',monospace">${s.sst.value} °C</span></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--text-tertiary)">SSH</span><span style="font-weight:600;font-family:'JetBrains Mono',monospace">${s.ssh.value} m</span></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--text-tertiary)">SSS</span><span style="font-weight:600;font-family:'JetBrains Mono',monospace">${s.sss.value} PSU</span></div>
+    <div style="height:1px;background:var(--border-subtle);margin:4px 0"></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--text-tertiary)">50m</span><span style="font-weight:600;font-family:'JetBrains Mono',monospace">${p['50m']} °C</span></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--text-tertiary)">100m</span><span style="font-weight:600;font-family:'JetBrains Mono',monospace">${p['100m']} °C</span></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--text-tertiary)">200m</span><span style="font-weight:600;font-family:'JetBrains Mono',monospace">${p['200m']} °C</span></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--text-tertiary)">500m</span><span style="font-weight:600;font-family:'JetBrains Mono',monospace">${p['500m']} °C</span></div>
+    <div style="height:1px;background:var(--border-subtle);margin:4px 0"></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--text-tertiary)">D26</span><span style="font-weight:700;font-family:'JetBrains Mono',monospace;color:var(--accent)">${pt.d26 !== null ? pt.d26 + ' m' : 'N/A'}</span></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--text-tertiary)">Risk</span><span class="cy-risk-${pt.riskLevel.toLowerCase()}">${pt.riskLevel}</span></div>
+    <div style="display:flex;justify-content:space-between"><span style="color:var(--text-tertiary)">Confidence</span><span style="font-weight:600">${pt.confidence}</span></div>
+  `;
+  // Draw chart
+  const cv = document.getElementById('cy-chart');
+  if (cyChart) cyChart.destroy();
+  const depths = [0, 50, 100, 200, 500];
+  const temps = [p.surface, p['50m'], p['100m'], p['200m'], p['500m']];
+  cyChart = new Chart(cv, {
+    type: 'line',
+    data: {
+      labels: depths.map(v => v + 'm'),
+      datasets: [{
+        label: 'Predicted',
+        data: temps,
+        borderColor: '#38a8ff',
+        backgroundColor: 'rgba(56,168,255,.06)',
+        borderWidth: 2.5,
+        pointBackgroundColor: '#38a8ff',
+        pointBorderColor: '#e8f0fe',
+        pointBorderWidth: 1.5,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        tension: 0.3,
+        fill: true
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: 'rgba(15,21,38,.94)',
+          titleColor: '#e8f0fe',
+          bodyColor: '#94a3c0',
+          borderColor: 'rgba(100,160,255,.12)',
+          borderWidth: 1,
+          padding: 10,
+          callbacks: {
+            title: i => 'Depth: ' + i[0].label,
+            label: c => ` ${c.dataset.label}: ${c.parsed.y.toFixed(2)} °C`
+          }
+        }
+      },
+      scales: {
+        x: { title: { display: true, text: 'Depth (m)', color: '#5e7090', font: { size: 11, weight: 600 } }, ticks: { color: '#5e7090', font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: 'rgba(100,160,255,.04)' } },
+        y: { title: { display: true, text: 'Temperature (°C)', color: '#5e7090', font: { size: 11, weight: 600 } }, ticks: { color: '#5e7090', font: { family: 'JetBrains Mono', size: 10 }, callback: v => v + '°' }, grid: { color: 'rgba(100,160,255,.04)' } }
+      }
+    }
+  });
 }
 
 // ═══════════════════════════════════════════════════════════════

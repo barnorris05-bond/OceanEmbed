@@ -488,6 +488,221 @@ def copilot_chat():
         return jsonify({"error": "Copilot encountered an error. Please try again.", "detail": str(e), "available": True}), 500
 
 
+# ── Cyclone Intelligence: Ocean Heat Assessment ──────────────
+
+# Validated domain bounds (from dataset)
+_DOMAIN = {
+    "lat_min": 8.0, "lat_max": 24.0,
+    "lon_min": 60.0, "lon_max": 77.0,
+}
+
+
+def compute_tchp(predicted):
+    """Calculate D26 (depth of 26 °C isotherm) by linear interpolation.
+    Returns depth in metres, or None if 26 °C is outside the profile."""
+    depths = [0, 50, 100, 200, 500]
+    temps = [
+        predicted["surface"], predicted["50m"],
+        predicted["100m"], predicted["200m"], predicted["500m"],
+    ]
+    target = 26.0
+    # Find where temperature crosses 26 °C
+    for i in range(len(depths) - 1):
+        if temps[i] >= target and temps[i + 1] < target:
+            # Linear interpolation
+            frac = (temps[i] - target) / (temps[i] - temps[i + 1])
+            return round(depths[i] + frac * (depths[i + 1] - depths[i]), 1)
+    # If all temps are above 26 °C, D26 is deeper than 500 m
+    if all(t >= target for t in temps):
+        return 500.0
+    return None
+
+
+def risk_from_d26(d26):
+    """Classify risk level from D26 depth."""
+    if d26 is None:
+        return "Low"
+    if d26 >= 50:
+        return "Elevated"
+    if d26 >= 30:
+        return "Moderate"
+    return "Low"
+
+
+def nearest_obs_distance(lat, lon):
+    """Find the nearest observation point and return distance in km."""
+    if df is None:
+        return None
+    ocean_locs = df[["lat", "lon"]].drop_duplicates()
+    lats = ocean_locs["lat"].values.astype(float)
+    lons = ocean_locs["lon"].values.astype(float)
+    # Haversine approximation (good enough for short distances)
+    dlat = np.radians(lats - lat)
+    dlon = np.radians(lons - lon)
+    a = np.sin(dlat / 2) ** 2 + np.cos(np.radians(lat)) * np.cos(np.radians(lats)) * np.sin(dlon / 2) ** 2
+    dists = 6371.0 * 2 * np.arcsin(np.sqrt(a))
+    return round(float(np.min(dists)), 1)
+
+
+def confidence_from_distance(d_km):
+    """Map nearest-observation distance to a confidence label."""
+    if d_km is None:
+        return "Very Low"
+    if d_km <= 5:
+        return "High"
+    if d_km <= 15:
+        return "Medium"
+    if d_km <= 30:
+        return "Low"
+    return "Very Low"
+
+
+def is_in_domain(lat, lon):
+    """Check if a point is inside the validated Arabian Sea domain."""
+    return (
+        _DOMAIN["lat_min"] <= lat <= _DOMAIN["lat_max"]
+        and _DOMAIN["lon_min"] <= lon <= _DOMAIN["lon_max"]
+    )
+
+
+def _interpolate_nearest(lat, lon, date_str):
+    """Interpolate SST/SSH/SSS from the nearest observation for an arbitrary point."""
+    if df is None:
+        return None
+    ocean_locs = df[["lat", "lon"]].drop_duplicates()
+    lats = ocean_locs["lat"].values.astype(float)
+    lons = ocean_locs["lon"].values.astype(float)
+    dlat = np.radians(lats - lat)
+    dlon = np.radians(lons - lon)
+    a = np.sin(dlat / 2) ** 2 + np.cos(np.radians(lat)) * np.cos(np.radians(lats)) * np.sin(dlon / 2) ** 2
+    dists = 6371.0 * 2 * np.arcsin(np.sqrt(a))
+    idx = int(np.argmin(dists))
+    nlat, nlon = float(lats[idx]), float(lons[idx])
+    row = df[(df["lat"] == nlat) & (df["lon"] == nlon)].iloc[0]
+    return {
+        "sst": round(float(row["sst"]), 2),
+        "ssh": round(float(row["ssh"]), 4),
+        "sss": round(float(row["sss"]), 2),
+        "dayOfYear": int(row["day_of_year"]),
+        "distKm": round(float(dists[idx]), 1),
+    }
+
+
+def _predict_from_surface(lat, lon, sst, ssh, sss, day_of_year):
+    """Run the ML model to get subsurface temperature predictions."""
+    if model is None:
+        return None
+    features = pd.DataFrame(
+        [[lat, lon, day_of_year, sst, ssh, sss]],
+        columns=["lat", "lon", "day_of_year", "sst", "ssh", "sss"],
+    )
+    pred = model.predict(features)[0]
+    return {
+        "surface": round(sst, 2),
+        "50m": round(float(pred[0]), 2),
+        "100m": round(float(pred[1]), 2),
+        "200m": round(float(pred[2]), 2),
+        "500m": round(float(pred[3]), 2),
+    }
+
+
+@app.route("/api/cyclone-track", methods=["POST"])
+def cyclone_track():
+    """Analyse a supplied cyclone track for ocean heat support.
+
+    Accepts: {"points": [{"lat": float, "lon": float, "date": "YYYY-MM-DD"}, ...]}
+    Returns per-point D26, risk level, confidence, nearest observation, and predicted profile."""
+    data = request.get_json(silent=True)
+    if not data or "points" not in data:
+        return jsonify({"error": "Request must contain 'points' array."}), 400
+    points = data["points"]
+    if len(points) < 2:
+        return jsonify({"error": "Track must contain at least 2 points."}), 400
+    if len(points) > 50:
+        return jsonify({"error": "Track is too long. Maximum 50 points."}), 400
+    if model is None:
+        return jsonify({"error": "Prediction model is unavailable. Check model configuration."}), 503
+
+    results = []
+    best_d26 = -1
+    best_idx = 0
+
+    for i, pt in enumerate(points):
+        lat = float(pt.get("lat", 0))
+        lon = float(pt.get("lon", 0))
+        date_str = pt.get("date", "")
+
+        # Validate coordinates
+        if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+            results.append({"index": i, "error": f"Invalid coordinates ({lat}, {lon})", "valid": False})
+            continue
+        if not is_in_domain(lat, lon):
+            results.append({"index": i, "error": f"Outside validated domain ({lat:.2f}, {lon:.2f})", "valid": False})
+            continue
+
+        # Interpolate surface data from nearest observation
+        interp = _interpolate_nearest(lat, lon, date_str)
+        if interp is None:
+            results.append({"index": i, "error": "Cannot interpolate surface data", "valid": False})
+            continue
+
+        # Run ML model
+        predicted = _predict_from_surface(
+            lat, lon, interp["sst"], interp["ssh"], interp["sss"], interp["dayOfYear"]
+        )
+        if predicted is None:
+            results.append({"index": i, "error": "Model prediction failed", "valid": False})
+            continue
+
+        d26 = compute_tchp(predicted)
+        risk = risk_from_d26(d26)
+        nearest_km = nearest_obs_distance(lat, lon)
+        conf = confidence_from_distance(nearest_km)
+
+        results.append({
+            "index": i,
+            "valid": True,
+            "date": date_str,
+            "lat": round(lat, 4),
+            "lon": round(lon, 4),
+            "d26": d26,
+            "riskLevel": risk,
+            "confidence": conf,
+            "nearestObsDistanceKm": nearest_km,
+            "predicted": predicted,
+            "surface": {
+                "sst": {"value": interp["sst"], "unit": "\u00b0C", "source": "NASA JPL MUR SST v4.1", "classification": "SOURCE"},
+                "ssh": {"value": interp["ssh"], "unit": "m", "source": "NOAA NESDIS SLA", "classification": "SOURCE"},
+                "sss": {"value": interp["sss"], "unit": "PSU", "source": "Argo CTD / ESA SMOS", "classification": "MATCHED"},
+            },
+        })
+
+        if d26 is not None and d26 > best_d26:
+            best_d26 = d26
+            best_idx = len(results) - 1
+
+    # Identify peak
+    valid_results = [r for r in results if r.get("valid")]
+    peak = None
+    if valid_results:
+        best_valid = max(valid_results, key=lambda r: r.get("d26") or 0)
+        peak = {
+            "index": best_valid["index"],
+            "lat": best_valid["lat"],
+            "lon": best_valid["lon"],
+            "date": best_valid["date"],
+            "d26": best_valid["d26"],
+            "riskLevel": best_valid["riskLevel"],
+        }
+
+    return jsonify({
+        "results": results,
+        "peak": peak,
+        "totalPoints": len(points),
+        "validPoints": len(valid_results),
+    })
+
+
 if __name__ == "__main__":
     print("OceanEmbed API starting on http://localhost:5001")
     app.run(host="0.0.0.0", port=5001, debug=True)
