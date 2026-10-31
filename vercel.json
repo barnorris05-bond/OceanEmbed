@@ -1,10 +1,9 @@
 {
-  "buildCommand": "bash build.sh",
   "outputDirectory": "public",
-  "installCommand": "pip install -r requirements.txt",
+  "buildCommand": "python3 --version",
+  "installCommand": "python3 -m pip install flask gunicorn",
   "functions": {
     "api/index.py": {
-      "runtime": "@vercel/python",
       "maxDuration": 30
     }
   },
